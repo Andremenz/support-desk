@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  AGENT
+  FOUNDER
+}
+
+enum PlanTier {
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+enum TicketStatus {
+  NEW
+  OPEN
+  PENDING_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum Visibility {
+  CUSTOMER_VISIBLE
+  INTERNAL
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  planTier  PlanTier @default(STARTER)
+  users     User[]
+  tickets   Ticket[]
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  passwordHash   String
+  role           Role
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  
+  createdTickets Ticket[]      @relation("CreatedTickets")
+  assignedTickets Ticket[]     @relation("AssignedTickets")
+  messages       Message[]
+  events         TicketEvent[]
+  
+  createdAt      DateTime      @default(now())
+}
+
+model Ticket {
+  id               String       @id @default(cuid())
+  subject          String
+  status           TicketStatus @default(NEW)
+  priority         Priority     @default(NORMAL)
+  
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  
+  createdById      String
+  createdBy        User         @relation("CreatedTickets", fields: [createdById], references: [id])
+  
+  assignedAgentId  String?
+  assignedAgent    User?        @relation("AssignedTickets", fields: [assignedAgentId], references: [id])
+  
+  messages         Message[]
+  events           TicketEvent[]
+  
+  firstResponseAt  DateTime?
+  resolvedAt       DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model Message {
+  id         String     @id @default(cuid())
+  body       String
+  visibility Visibility @default(CUSTOMER_VISIBLE)
+  
+  ticketId   String
+  ticket     Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  authorId   String
+  author     User       @relation(fields: [authorId], references: [id])
+  
+  createdAt  DateTime   @default(now())
+}
+
+model TicketEvent {
+  id        String   @id @default(cuid())
+  type      String   // e.g., "STATUS_CHANGED", "ASSIGNED", "AI_DRAFTED"
+  detail    String?
+  
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  actorId   String
+  actor     User     @relation(fields: [actorId], references: [id])
+  
+  createdAt DateTime @default(now())
+}
