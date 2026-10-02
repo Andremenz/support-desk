@@ -1,19 +1,32 @@
+"use client";
+
+import { useActionState } from "react";
 import { createTicket } from "@/app/customer/actions";
 
-export default async function NewTicketPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const { error } = await searchParams;
+type CreateTicketState = { error?: string } | null;
+
+export default function NewTicketPage() {
+  const [state, formAction, pending] = useActionState(
+    async (_previousState: CreateTicketState, formData: FormData) =>
+      createTicket(formData),
+    null,
+  );
 
   return (
     <div className="max-w-xl">
       <h1 className="mb-6 text-xl font-bold text-gray-900">
         New support request
       </h1>
+      {state?.error && (
+        <p
+          className="mb-4 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-600"
+          role="alert"
+        >
+          {state.error}
+        </p>
+      )}
       <form
-        action={createTicket}
+        action={formAction}
         className="space-y-4 rounded-lg border border-gray-200 bg-white p-6"
       >
         <div>
@@ -51,14 +64,12 @@ export default async function NewTicketPage({
             required
           />
         </div>
-        {error === "invalid" && (
-          <p className="text-sm text-red-700" role="alert">
-            Subject must be 5–120 characters and description at least 10
-            characters.
-          </p>
-        )}
-        <button className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
-          Submit request
+        <button
+          className="rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+          type="submit"
+          disabled={pending}
+        >
+          {pending ? "Submitting..." : "Submit request"}
         </button>
       </form>
     </div>
