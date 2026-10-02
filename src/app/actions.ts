@@ -1,8 +1,6 @@
 "use server";
 
-import { Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { z } from "zod";
 import { clearSession, createSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
@@ -11,40 +9,38 @@ export type LoginState = {
   error: string | null;
 };
 
-const credentialsSchema = z.object({
-  email: z.string().trim().email(),
-  password: z.string().min(1),
-});
+export async function login(formData: FormData) {
+  try {
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
 
-export async function login(
-  _previousState: LoginState,
-  formData: FormData,
-): Promise<LoginState> {
-  const credentials = credentialsSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
-  });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return { error: "Invalid credentials" };
 
-  if (!credentials.success) {
-    return { error: "Invalid credentials" };
-  }
+    const match = await bcrypt.compare(password, user.passwordHash);
+    if (!match) return { error: "Invalid credentials" };
 
-  const user = await prisma.user.findUnique({
-    where: { email: credentials.data.email },
-  });
-  if (!user || !(await bcrypt.compare(credentials.data.password, user.passwordHash))) {
-    return { error: "Invalid credentials" };
-  }
+    await createSession(user.id, user.role);
 
-  await createSession(user.id, user.role);
+    if (user.role === "CUSTOMER") redirect("/customer");
+    if (user.role === "AGENT") redirect("/agent");
+    if (user.role === "FOUNDER") redirect("/founder");
 
-  switch (user.role) {
-    case Role.CUSTOMER:
-      redirect("/customer");
-    case Role.AGENT:
-      redirect("/agent");
-    case Role.FOUNDER:
-      redirect("/founder");
+    redirect("/login");
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      String(error.digest).startsWith("NEXT_")
+    ) {
+      throw error;
+    }
+    const message =
+      error && typeof error === "object" && "message" in error
+        ? String(error.message)
+        : String(error);
+    return { error: `Login failed: ${message}` };
   }
 }
 
