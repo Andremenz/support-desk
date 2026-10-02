@@ -6,7 +6,10 @@ import { login, type LoginState } from "@/app/actions";
 const initialState: LoginState = { error: null };
 
 export function LoginForm() {
-  const [state, formAction, isPending] = useActionState(login, initialState);
+  const [state, formAction, isPending] = useActionState(
+    async (_previousState: LoginState, formData: FormData) => login(formData),
+    initialState,
+  );
 
   return (
     <form action={formAction} className="space-y-4">
